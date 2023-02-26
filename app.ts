@@ -1,5 +1,17 @@
-import { computed, inject, onDestroy, onMount, provider, signal } from "signal"
-import { addElement, component, render, text } from "dom"
+import {
+  computed,
+  inject,
+  onDestroy,
+  onMount,
+  provider,
+  signal,
+} from "https://raw.githubusercontent.com/mini-jail/signal/main/mod.ts"
+import {
+  addElement,
+  component,
+  render,
+  text,
+} from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 
 function onEvent<T extends keyof GlobalEventHandlersEventMap>(
   name: T,
