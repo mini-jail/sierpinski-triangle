@@ -8,5 +8,5 @@ const command = (strings: TemplateStringsArray) => {
 command`deno bundle ./app.ts ./static/app.js`
 
 serve(async (req: Request) => {
-  return await serveDir(req, { urlRoot: "./static" })
+  return await serveDir(req, { showIndex: true, fsRoot: "./static" })
 })
