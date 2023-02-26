@@ -408,23 +408,25 @@ const Notifications = component(()=>{
             addElement("div", (attr)=>{
                 attr.class = "notification";
                 attr.textContent = `${getTime(item.date)}: ${item.title}`;
-                disappearOnMouseDown(()=>unnotify(item));
+                disappearOnMouseDown(()=>unnotify(item), 2000);
                 addElement("div", (attr)=>attr.textContent = item.message);
             });
         }
     });
 });
-function disappearOnMouseDown(callback) {
+function disappearOnMouseDown(callback, timeout) {
     const elt = elRef();
     if (elt === undefined) return;
     let deleteTimeId;
-    const onMouseDown = ()=>{
+    const onMouseDown = (ev)=>{
+        if (ev.button !== 0) return;
         elt.setAttribute("disappear", "");
+        elt.style.setProperty("--timeout", timeout + "ms");
         deleteTimeId = setTimeout(()=>{
-            callback?.();
-        }, 1000);
+            callback();
+        }, timeout);
     };
-    const onMouseUp = ()=>{
+    const onMouseUp = (ev)=>{
         elt.removeAttribute("disappear");
         clearTimeout(deleteTimeId);
     };

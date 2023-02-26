@@ -1,0 +1,20 @@
+[disappear] {
+  --timeout: 1000ms;
+  animation-name: disappear;
+  animation-duration: var(--timeout);
+}
+
+@keyframes disappear {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(0.75);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+}

@@ -1,3 +1,5 @@
+@import url("./disappear.css");
+
 * {
   margin: 0;
   padding: 0;
@@ -47,23 +49,4 @@ body {
   border-radius: 10px;
   user-select: none;
   cursor: pointer;
-}
-
-[disappear] {
-  --timeout: 1s;
-  transition: 100ms;
-  animation-name: disappear;
-  animation-duration: var(--timeout);
-  animation-iteration-count: infinite;
-}
-
-@keyframes disappear {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
 }

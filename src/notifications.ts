@@ -52,24 +52,26 @@ export const Notifications = component(() => {
       addElement("div", (attr) => {
         attr.class = "notification"
         attr.textContent = `${getTime(item.date)}: ${item.title}`
-        disappearOnMouseDown(() => unnotify(item))
+        disappearOnMouseDown(() => unnotify(item), 2000)
         addElement("div", (attr) => attr.textContent = item.message)
       })
     }
   })
 })
 
-function disappearOnMouseDown(callback?: () => void) {
+function disappearOnMouseDown(callback: () => void, timeout: number) {
   const elt = elRef()
   if (elt === undefined) return
   let deleteTimeId: number
-  const onMouseDown = () => {
+  const onMouseDown = (ev: MouseEvent) => {
+    if (ev.button !== 0) return
     elt.setAttribute("disappear", "")
+    elt.style.setProperty("--timeout", timeout + "ms")
     deleteTimeId = setTimeout(() => {
-      callback?.()
-    }, 1000)
+      callback()
+    }, timeout)
   }
-  const onMouseUp = () => {
+  const onMouseUp = (ev: MouseEvent) => {
     elt.removeAttribute("disappear")
     clearTimeout(deleteTimeId)
   }
