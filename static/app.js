@@ -237,7 +237,9 @@ function inject(context) {
 }
 let parentFgt;
 let parentElt;
-const Fields = new Set();
+function elRef() {
+    return parentElt;
+}
 function addElement(tagName, callback) {
     if (parentElt || parentFgt) {
         const elt = document.createElement(tagName);
@@ -247,11 +249,6 @@ function addElement(tagName, callback) {
 }
 function addText(value) {
     if (parentElt || parentFgt) insert(new Text(String(value)));
-}
-function text(strings, ...values) {
-    addText(strings.reduce((result, string, i)=>{
-        return result += string + (i in values ? values[i] : "");
-    }, ""));
 }
 function render(rootElt, callback) {
     return scoped((cleanup)=>{
@@ -291,10 +288,9 @@ function eventName(name) {
     return name.startsWith("on:") ? name.slice(3) : name.slice(2).toLowerCase();
 }
 function objectAttribute(elt, field, curr, next) {
-    if (curr) addFields(curr);
-    if (next) addFields(next);
-    if (Fields.size === 0) return;
-    for (const subField of Fields){
+    const fields = fieldsFrom(curr, next);
+    if (fields.length === 0) return;
+    for (const subField of fields){
         if (next && typeof next[subField] === "function") {
             effect((subCurr)=>{
                 const subNext = next[subField]();
@@ -307,7 +303,6 @@ function objectAttribute(elt, field, curr, next) {
             elt[field][subField] = next[subField] || null;
         }
     }
-    Fields.clear();
 }
 function dynamicAttribute(elt, field, accessor) {
     effect((curr)=>{
@@ -340,19 +335,26 @@ function insert(node) {
     if (parentFgt) parentFgt.push(node);
     else parentElt?.appendChild(node);
 }
-function addFields(object) {
-    for(const field in object)Fields.add(field);
+function fieldsFrom(...objects) {
+    const fields = [];
+    for (const object of objects){
+        if (object == null) continue;
+        for(const field in object){
+            if (fields.includes(field) === false) {
+                fields.push(field);
+            }
+        }
+    }
+    return fields;
 }
 function attributes(elt, curr, next) {
-    if (curr) addFields(curr);
-    if (next) addFields(next);
-    if (Fields.size === 0) return;
-    for (const field of Fields){
+    const fields = fieldsFrom(curr, next);
+    if (fields.length === 0) return;
+    for (const field of fields){
         const cValue = curr ? curr[field] : undefined;
         const nValue = next ? next[field] : undefined;
         if (cValue !== nValue) attribute(elt, field, cValue, nValue);
     }
-    Fields.clear();
 }
 function children(elt, curr, next) {
     if (curr?.length) union(elt, curr, next);
@@ -367,32 +369,89 @@ function modify(elt, callback) {
         parentElt = elt;
         parentFgt = next[1];
         callback(next[0]);
-        if (next[0]) attributes(elt, curr ? curr[0] : undefined, next[0]);
-        if (next[1].length) children(elt, curr ? curr[1] : undefined, next[1]);
+        if (curr || next[0]) attributes(elt, curr ? curr[0] : undefined, next[0]);
+        if (curr || next[1].length) {
+            children(elt, curr ? curr[1] : undefined, next[1]);
+        }
         if (next[1].length === 0) next[1] = undefined;
         parentElt = undefined;
         parentFgt = undefined;
         return next;
     });
 }
-function onEvent(name, callback, options) {
-    onMount(()=>addEventListener(name, callback, options));
-    onDestroy(()=>removeEventListener(name, callback, options));
+const injectNotification = ()=>inject(NotificationContext);
+const NotificationContext = provider(()=>{
+    const notifications = signal([]);
+    return {
+        notify (title, message) {
+            notifications(notifications().concat({
+                date: new Date(),
+                title: title,
+                message: message
+            }));
+        },
+        unnotify (item) {
+            notifications(notifications().filter(($)=>$ !== item));
+        },
+        focus: signal(),
+        notifications,
+        getTime (date) {
+            return `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+        }
+    };
+});
+const Notifications = component(()=>{
+    const { notifications , getTime , unnotify  } = injectNotification();
+    addElement("div", (attr)=>{
+        attr.class = "notifications";
+        for (const item of notifications()){
+            addElement("div", (attr)=>{
+                attr.class = "notification";
+                attr.textContent = `${getTime(item.date)}: ${item.title}`;
+                disappearOnMouseDown(()=>unnotify(item));
+                addElement("div", (attr)=>attr.textContent = item.message);
+            });
+        }
+    });
+});
+function disappearOnMouseDown(callback) {
+    const elt = elRef();
+    if (elt === undefined) return;
+    let deleteTimeId;
+    const onMouseDown = ()=>{
+        elt.setAttribute("disappear", "");
+        deleteTimeId = setTimeout(()=>{
+            callback?.();
+        }, 1000);
+    };
+    const onMouseUp = ()=>{
+        elt.removeAttribute("disappear");
+        clearTimeout(deleteTimeId);
+    };
+    onMount(()=>{
+        elt.addEventListener("mousedown", onMouseDown);
+        elt.addEventListener("mouseup", onMouseUp);
+    });
+    onDestroy(()=>{
+        elt.removeEventListener("mousedown", onMouseDown);
+        elt.removeEventListener("mouseup", onMouseUp);
+    });
 }
 const TriangleContext = provider(()=>{
-    const target = signal(1000);
     const elapsed = signal(0);
     const count = signal(0);
-    const interval = signal(1000);
-    const size = signal(25);
-    const dots = signal(0);
+    const steps = {
+        size: 5,
+        target: 50
+    };
     return {
-        target,
+        target: signal(1000),
         elapsed,
         count,
-        interval,
-        size,
-        dots,
+        interval: signal(1000),
+        size: signal(25),
+        dots: signal(0),
+        steps,
         scale: computed(()=>{
             const e = elapsed() / 1000 % 10;
             return 1 + (e > 5 ? 10 - e : e) / 10;
@@ -400,56 +459,9 @@ const TriangleContext = provider(()=>{
         countText: computed(()=>count().toString())
     };
 });
-render(document.body, ()=>{
-    const { target , interval , size  } = inject(TriangleContext);
-    onEvent("keyup", ({ key  })=>{
-        switch(key){
-            case "ArrowUp":
-                {
-                    size(size() + 5);
-                    break;
-                }
-            case "ArrowDown":
-                {
-                    const next = size() - 5;
-                    if (next >= 5) size(next);
-                    break;
-                }
-            case "ArrowLeft":
-                {
-                    target(target() - 50);
-                    break;
-                }
-            case "ArrowRight":
-                {
-                    target(target() + 50);
-                    break;
-                }
-        }
-    });
-    Stats();
-    TriangleDemo(target(), size(), interval());
-});
-const Stats = component(()=>{
-    const { target , size , interval , dots  } = inject(TriangleContext);
-    addElement("pre", (attr)=>{
-        attr.style = {
-            zIndex: "1",
-            position: "absolute",
-            padding: "10px",
-            margin: "10px",
-            backgroundColor: "cornflowerblue",
-            borderRadius: "10px"
-        };
-        text`Stats: 
-  target: ${target()}
-  size: ${size()}
-  interval: ${interval()}
-  dots: ${dots()}`;
-    });
-});
+const injectTriangle = ()=>inject(TriangleContext);
 const TriangleDemo = component((target, size, interval)=>{
-    const { elapsed , count , scale  } = inject(TriangleContext);
+    const { elapsed , count , scale  } = injectTriangle();
     let id;
     onMount(()=>{
         console.log("mount");
@@ -466,13 +478,14 @@ const TriangleDemo = component((target, size, interval)=>{
         clearInterval(id);
     });
     addElement("div", (attr)=>{
-        attr.id = "sierpinski-triangle";
-        attr.class = "container";
         attr.style = ()=>`
+        position: absolute;
+        left: 50%;
+        top: 50%;
         transform:
           scaleX(${scale() / 2.1}) 
           scaleY(0.7) 
-          translateZ(0.1px)
+          translateZ(0.1px);
       `;
         Triangle(0, 0, target, size);
     });
@@ -490,15 +503,18 @@ const Dot = component((x, y, target)=>{
     const mouseOut = ()=>hover(false);
     const mouseOver = ()=>hover(true);
     const text = ()=>hover() ? "*" + countText() + "*" : countText();
-    const color = ()=>hover() === true ? "cornflowerblue" : "pink";
+    const color = ()=>hover() === true ? "cornflowerblue" : "thistle";
     onMount(()=>dots(dots() + 1));
     onDestroy(()=>dots(dots() - 1));
     addElement("div", (attr)=>{
-        attr.class = "dot";
         attr.onMouseOver = mouseOver;
         attr.onMouseOut = mouseOut;
         attr.textContent = text;
         attr.style = {
+            position: "absolute",
+            textAlign: "center",
+            cursor: "pointer",
+            userSelect: "none",
             width: target + "px",
             height: target + "px",
             lineHeight: target + "px",
@@ -508,5 +524,78 @@ const Dot = component((x, y, target)=>{
             fontSize: target / 2.5 + "px",
             borderRadius: target + "px"
         };
+    });
+});
+function onEvent(name, callback, options) {
+    onMount(()=>addEventListener(name, callback, options));
+    onDestroy(()=>removeEventListener(name, callback, options));
+}
+render(document.body, ()=>{
+    const { target , interval , size , steps  } = injectTriangle();
+    const { notify , focus , unnotify  } = injectNotification();
+    onEvent("keyup", ({ key  })=>{
+        const controls = {
+            ArrowUp () {
+                size(size() + steps.size);
+                notify("Settings updated", "Size has been increased");
+            },
+            ArrowDown () {
+                const next = size() - steps.size;
+                if (next >= 5) {
+                    size(next);
+                    notify("Settings updated", "Size has been decreased");
+                }
+            },
+            ArrowLeft () {
+                target(target() - steps.target);
+                notify("Settings updated", "Target has been decreased");
+            },
+            ArrowRight () {
+                target(target() + steps.target);
+                notify("Settings updated", "Target has been increased");
+            },
+            Delete () {
+                if (focus()) unnotify(focus());
+                focus(undefined);
+            }
+        };
+        controls[key]?.();
+    });
+    Notifications();
+    FlexBox(Stats, Control);
+    TriangleDemo(target(), size(), interval());
+});
+const FlexBox = component((...children)=>{
+    addElement("div", (attr)=>{
+        attr.style = {
+            display: "flex",
+            flexDirection: "column",
+            margin: "10px",
+            gap: "10px",
+            width: "max-content"
+        };
+        for (const child of children)child();
+    });
+});
+const Stats = component(()=>{
+    const { target , size , interval , dots  } = injectTriangle();
+    addElement("pre", (attr)=>{
+        attr.class = "window";
+        addText("Stats:\n");
+        addText(`  target: ${target()}\n`);
+        addText(`  size: ${size()}\n`);
+        addText(`  interval: ${interval()}\n`);
+        addText(`  dots: ${dots()}\n`);
+    });
+});
+const Control = component(()=>{
+    const { steps  } = injectTriangle();
+    addElement("pre", (attr)=>{
+        attr.class = "window";
+        addText("Control:\n");
+        addText(`  ArrowUp: size + ${steps.size}\n`);
+        addText(`  ArrowDown: size - ${steps.size}\n`);
+        addText(`  ArrowRight: target + ${steps.target}\n`);
+        addText(`  ArrowLeft: target - ${steps.target}\n`);
     });
 });

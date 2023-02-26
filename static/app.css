@@ -13,21 +13,57 @@ html {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background-color: cornsilk;
 }
 
 body {
   font-family: monospace;
 }
 
-.container {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+.window {
+  padding: 10px;
+  background-color: thistle;
+  border-radius: 10px;
+  font-size: large;
 }
 
-.dot {
-  position: absolute;
-  text-align: center;
-  cursor: pointer;
+.notifications {
+  position: fixed;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: max-content;
+  max-height: calc(100vh - 20px);
+  overflow: auto;
+  padding: 10px;
+  z-index: 1;
+}
+
+.notification {
+  background-color: thistle;
+  padding: 10px;
+  border-radius: 10px;
   user-select: none;
+  cursor: pointer;
+}
+
+[disappear] {
+  --timeout: 1s;
+  transition: 100ms;
+  animation-name: disappear;
+  animation-duration: var(--timeout);
+  animation-iteration-count: infinite;
+}
+
+@keyframes disappear {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
 }

@@ -1,171 +1,88 @@
-import {
-  computed,
-  inject,
-  onDestroy,
-  onMount,
-  provider,
-  signal,
-} from "https://raw.githubusercontent.com/mini-jail/signal/main/mod.ts"
+import {} from "https://raw.githubusercontent.com/mini-jail/signal/main/mod.ts"
 import {
   addElement,
+  addText,
   component,
   render,
-  text,
 } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 
-function onEvent<T extends keyof GlobalEventHandlersEventMap>(
-  name: T,
-  callback: (event: GlobalEventHandlersEventMap[T]) => void,
-  options?: EventListenerOptions,
-): void {
-  onMount(() => addEventListener(name, callback, options))
-  onDestroy(() => removeEventListener(name, callback, options))
-}
-
-const TriangleContext = provider(() => {
-  const target = signal(1000)
-  const elapsed = signal(0)
-  const count = signal(0)
-  const interval = signal(1000)
-  const size = signal(25)
-  const dots = signal(0)
-  return {
-    target,
-    elapsed,
-    count,
-    interval,
-    size,
-    dots,
-    scale: computed(() => {
-      const e = (elapsed() / 1000) % 10
-      return 1 + (e > 5 ? 10 - e : e) / 10
-    }),
-    countText: computed(() => count().toString()),
-  }
-})!
+import { injectNotification, Notifications } from "./src/notifications.ts"
+import { injectTriangle, TriangleDemo } from "./src/sierpinski-triangle.ts"
+import { onEvent } from "./src/on-event.ts"
 
 render(document.body, () => {
-  const { target, interval, size } = inject(TriangleContext)
+  const { target, interval, size, steps } = injectTriangle()
+  const { notify, focus, unnotify } = injectNotification()
+
   onEvent("keyup", ({ key }) => {
-    switch (key) {
-      case "ArrowUp": {
-        size(size() + 5)
-        break
-      }
-      case "ArrowDown": {
-        const next = size() - 5
-        if (next >= 5) size(next)
-        break
-      }
-      case "ArrowLeft": {
-        target(target() - 50)
-        break
-      }
-      case "ArrowRight": {
-        target(target() + 50)
-        break
-      }
+    const controls: Record<string, VoidFunction> = {
+      ArrowUp() {
+        size(size() + steps.size)
+        notify("Settings updated", "Size has been increased")
+      },
+      ArrowDown() {
+        const next = size() - steps.size
+        if (next >= 5) {
+          size(next)
+          notify("Settings updated", "Size has been decreased")
+        }
+      },
+      ArrowLeft() {
+        target(target() - steps.target)
+        notify("Settings updated", "Target has been decreased")
+      },
+      ArrowRight() {
+        target(target() + steps.target)
+        notify("Settings updated", "Target has been increased")
+      },
+      Delete() {
+        if (focus()) unnotify(focus()!)
+        focus(undefined)
+      },
     }
+    controls[key]?.()
   })
 
-  Stats()
-
+  Notifications()
+  FlexBox(Stats, Control)
   TriangleDemo(target(), size(), interval())
 })
 
-const Stats = component(() => {
-  const { target, size, interval, dots } = inject(TriangleContext)
-
-  addElement("pre", (attr) => {
+const FlexBox = component((...children: (() => void)[]) => {
+  addElement("div", (attr) => {
     attr.style = {
-      zIndex: "1",
-      position: "absolute",
-      padding: "10px",
+      display: "flex",
+      flexDirection: "column",
       margin: "10px",
-      backgroundColor: "cornflowerblue",
-      borderRadius: "10px",
+      gap: "10px",
+      width: "max-content",
     }
-    text`Stats: 
-  target: ${target()}
-  size: ${size()}
-  interval: ${interval()}
-  dots: ${dots()}`
+    for (const child of children) child()
   })
 })
 
-const TriangleDemo = component(
-  (target: number, size: number, interval: number) => {
-    const { elapsed, count, scale } = inject(TriangleContext)
-    let id: number
+const Stats = component(() => {
+  const { target, size, interval, dots } = injectTriangle()
 
-    onMount(() => {
-      console.log("mount")
-      id = setInterval(() => count((count() % 10) + 1), interval)
-      const start = Date.now()
-      const frame = () => {
-        elapsed(Date.now() - start)
-        requestAnimationFrame(frame)
-      }
-      requestAnimationFrame(frame)
-    })
-
-    onDestroy(() => {
-      console.log("destroy")
-      clearInterval(id)
-    })
-
-    addElement("div", (attr) => {
-      attr.id = "sierpinski-triangle"
-      attr.class = "container"
-      attr.style = () => `
-        transform:
-          scaleX(${scale() / 2.1}) 
-          scaleY(0.7) 
-          translateZ(0.1px)
-      `
-      Triangle(0, 0, target, size)
-    })
-  },
-)
-
-const Triangle = component((
-  x: number,
-  y: number,
-  target: number,
-  size: number,
-) => {
-  if (target <= size) return Dot(x, y, target)
-  target = target / 2
-  Triangle(x, y - target / 2, target, size)
-  Triangle(x - target, y + target / 2, target, size)
-  Triangle(x + target, y + target / 2, target, size)
+  addElement("pre", (attr) => {
+    attr.class = "window"
+    addText("Stats:\n")
+    addText(`  target: ${target()}\n`)
+    addText(`  size: ${size()}\n`)
+    addText(`  interval: ${interval()}\n`)
+    addText(`  dots: ${dots()}\n`)
+  })
 })
 
-const Dot = component((x: number, y: number, target: number) => {
-  const { countText, dots } = inject(TriangleContext)
-  const hover = signal(false)
-  const mouseOut = () => hover(false)
-  const mouseOver = () => hover(true)
-  const text = () => hover() ? "*" + countText() + "*" : countText()
-  const color = () => hover() === true ? "cornflowerblue" : "pink"
+const Control = component(() => {
+  const { steps } = injectTriangle()
 
-  onMount(() => dots(dots() + 1))
-  onDestroy(() => dots(dots() - 1))
-
-  addElement("div", (attr) => {
-    attr.class = "dot"
-    attr.onMouseOver = mouseOver
-    attr.onMouseOut = mouseOut
-    attr.textContent = text
-    attr.style = {
-      width: target + "px",
-      height: target + "px",
-      lineHeight: target + "px",
-      backgroundColor: color,
-      left: x + "px",
-      top: y + "px",
-      fontSize: (target / 2.5) + "px",
-      borderRadius: target + "px",
-    }
+  addElement("pre", (attr) => {
+    attr.class = "window"
+    addText("Control:\n")
+    addText(`  ArrowUp: size + ${steps.size}\n`)
+    addText(`  ArrowDown: size - ${steps.size}\n`)
+    addText(`  ArrowRight: target + ${steps.target}\n`)
+    addText(`  ArrowLeft: target - ${steps.target}\n`)
   })
 })

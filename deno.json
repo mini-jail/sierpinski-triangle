@@ -8,5 +8,9 @@
   },
   "compilerOptions": {
     "lib": ["DOM", "ESNext", "deno.ns"]
+  },
+  "tasks": {
+    "dev": "deno bundle --watch ./app.ts ./static/app.js",
+    "serve": "deno run -A ./server.ts"
   }
 }
