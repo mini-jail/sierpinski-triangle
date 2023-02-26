@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "signal": "https://raw.githubusercontent.com/mini-jail/signal/main/mod.ts",
+    "dom": "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts",
+    "server": "https://deno.land/std@0.177.0/http/server.ts",
+    "file_server": "https://deno.land/std@0.178.0/http/file_server.ts"
+  }
+}
