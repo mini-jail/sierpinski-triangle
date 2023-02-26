@@ -69,6 +69,7 @@ render(document.body, () => {
   })
 
   Stats()
+
   TriangleDemo(target(), size(), interval())
 })
 
