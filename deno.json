@@ -12,6 +12,6 @@
   "tasks": {
     "build": "deno bundle ./src/app.ts ./static/app.js",
     "dev": "deno bundle --watch ./src/app.ts ./static/app.js",
-    "serve": "deno run -A ./server.ts"
+    "serve": "deno run -A ./mod.ts"
   }
 }
