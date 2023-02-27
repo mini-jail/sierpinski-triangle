@@ -1,7 +1,6 @@
 import {
   addElement,
   addText,
-  component,
   elRef,
 } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 import {
@@ -46,7 +45,7 @@ const NotificationContext = provider(() => {
   }
 })
 
-export const Notifications = component(() => {
+export const Notifications = () => {
   const { notifications, getTime, unnotify, notify } = injectNotification()
 
   const errorNotify = (err: any) => {
@@ -68,7 +67,7 @@ export const Notifications = component(() => {
       })
     }
   })
-})
+}
 
 function disappearOnMouseDown(callback: () => void, timeout: number) {
   const elt = elRef()

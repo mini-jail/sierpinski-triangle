@@ -256,9 +256,6 @@ function render(rootElt, callback) {
         return cleanup;
     });
 }
-function component(callback) {
-    return (...args)=>scoped(()=>callback(...args));
-}
 function union(elt, curr, next) {
     const currentLength = curr.length;
     const nextLength = next.length;
@@ -401,7 +398,7 @@ const NotificationContext = provider(()=>{
         }
     };
 });
-const Notifications = component(()=>{
+const Notifications = ()=>{
     const { notifications , getTime , unnotify , notify  } = injectNotification();
     const errorNotify = (err)=>{
         if (typeof err === "object") err = err?.message || JSON.stringify(err);
@@ -420,7 +417,7 @@ const Notifications = component(()=>{
             });
         }
     });
-});
+};
 function disappearOnMouseDown(callback, timeout) {
     const elt = elRef();
     if (elt === undefined) return;
@@ -464,7 +461,7 @@ const TriangleContext = provider(()=>{
     };
 });
 const injectTriangle = ()=>inject(TriangleContext);
-const TriangleDemo = component((target, size, interval)=>{
+const TriangleDemo = (target, size, interval)=>{
     const { elapsed , count , scale  } = injectTriangle();
     let id;
     onMount(()=>{
@@ -491,15 +488,15 @@ const TriangleDemo = component((target, size, interval)=>{
       `;
         Triangle(0, 0, target, size);
     });
-});
-const Triangle = component((x, y, target, size)=>{
+};
+const Triangle = (x, y, target, size)=>{
     if (target <= size) return Dot(x, y, target);
     target = target / 2;
     Triangle(x, y - target / 2, target, size);
     Triangle(x - target, y + target / 2, target, size);
     Triangle(x + target, y + target / 2, target, size);
-});
-const Dot = component((x, y, target)=>{
+};
+const Dot = (x, y, target)=>{
     const { countText , dots  } = inject(TriangleContext);
     const hover = signal(false);
     const mouseOut = ()=>hover(false);
@@ -522,18 +519,18 @@ const Dot = component((x, y, target)=>{
             borderRadius: target + "px"
         };
     });
-});
+};
 function onEvent(name, callback, options) {
     onMount(()=>addEventListener(name, callback, options));
     onDestroy(()=>removeEventListener(name, callback, options));
 }
-const FlexBoxColumn = component((...children)=>{
+const FlexBoxColumn = (...children)=>{
     addElement("div", (attr)=>{
         attr.class = "flex-box-col";
         for (const child of children)child();
     });
-});
-const Info = component((title, data)=>{
+};
+const Info = (title, data)=>{
     addElement("pre", (attr)=>{
         attr.class = "info";
         addElement("b", ()=>addText(title + ":\n"));
@@ -542,14 +539,14 @@ const Info = component((title, data)=>{
             addText(`  ${field}: ${current[field]}\n`);
         }
     });
-});
+};
 const App = ()=>{
     const { target , interval , size  } = injectTriangle();
     Notifications();
     FlexBoxColumn(Stats, Control);
     TriangleDemo(target(), size(), interval());
 };
-const Stats = component(()=>{
+const Stats = ()=>{
     const { target , size , interval , dots  } = injectTriangle();
     Info("Stats", ()=>({
             target: target(),
@@ -557,8 +554,8 @@ const Stats = component(()=>{
             interval: interval(),
             dots: dots()
         }));
-});
-const Control = component(()=>{
+};
+const Control = ()=>{
     const { target , size  } = injectTriangle();
     const { notify , focus , unnotify  } = injectNotification();
     onEvent("keyup", ({ key  })=>{
@@ -595,7 +592,7 @@ const Control = component(()=>{
             ArrowRight: "size + 50",
             ArrowLeft: "size - 50"
         }));
-});
+};
 render(document.body, ()=>{
     App();
 });

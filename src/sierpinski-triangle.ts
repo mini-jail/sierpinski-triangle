@@ -1,6 +1,5 @@
 import {
   addElement,
-  component,
 } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 import {
   computed,
@@ -31,41 +30,43 @@ const TriangleContext = provider(() => {
 
 export const injectTriangle = () => inject(TriangleContext)
 
-export const TriangleDemo = component(
-  (target: number, size: number, interval: number) => {
-    const { elapsed, count, scale } = injectTriangle()
-    let id: number
+export const TriangleDemo = (
+  target: number,
+  size: number,
+  interval: number,
+) => {
+  const { elapsed, count, scale } = injectTriangle()
+  let id: number
 
-    onMount(() => {
-      console.log("mount")
-      id = setInterval(() => count((count() % 10) + 1), interval)
-      const start = Date.now()
-      const frame = () => {
-        elapsed(Date.now() - start)
-        requestAnimationFrame(frame)
-      }
+  onMount(() => {
+    console.log("mount")
+    id = setInterval(() => count((count() % 10) + 1), interval)
+    const start = Date.now()
+    const frame = () => {
+      elapsed(Date.now() - start)
       requestAnimationFrame(frame)
-    })
+    }
+    requestAnimationFrame(frame)
+  })
 
-    onDestroy(() => {
-      console.log("destroy")
-      clearInterval(id)
-    })
+  onDestroy(() => {
+    console.log("destroy")
+    clearInterval(id)
+  })
 
-    addElement("div", (attr) => {
-      attr.class = "triangle-demo"
-      attr.style = () => `
+  addElement("div", (attr) => {
+    attr.class = "triangle-demo"
+    attr.style = () => `
         transform:
           scaleX(${scale() / 2.1}) 
           scaleY(0.7) 
           translateZ(0.1px);
       `
-      Triangle(0, 0, target, size)
-    })
-  },
-)
+    Triangle(0, 0, target, size)
+  })
+}
 
-const Triangle = component((
+const Triangle = (
   x: number,
   y: number,
   target: number,
@@ -76,9 +77,9 @@ const Triangle = component((
   Triangle(x, y - target / 2, target, size)
   Triangle(x - target, y + target / 2, target, size)
   Triangle(x + target, y + target / 2, target, size)
-})
+}
 
-const Dot = component((x: number, y: number, target: number) => {
+const Dot = (x: number, y: number, target: number) => {
   const { countText, dots } = inject(TriangleContext)
   const hover = signal(false)
   const mouseOut = () => hover(false)
@@ -103,4 +104,4 @@ const Dot = component((x: number, y: number, target: number) => {
       borderRadius: target + "px",
     }
   })
-})
+}

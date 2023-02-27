@@ -1,7 +1,4 @@
-import {
-  component,
-  render,
-} from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
+import { render } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 import { injectNotification, Notifications } from "./notifications.ts"
 import { injectTriangle, TriangleDemo } from "./sierpinski-triangle.ts"
 import onEvent from "./on-event.ts"
@@ -19,7 +16,7 @@ const App = () => {
   TriangleDemo(target(), size(), interval())
 }
 
-const Stats = component(() => {
+const Stats = () => {
   const { target, size, interval, dots } = injectTriangle()
 
   Info("Stats", () => ({
@@ -28,9 +25,9 @@ const Stats = component(() => {
     interval: interval(),
     dots: dots(),
   }))
-})
+}
 
-const Control = component(() => {
+const Control = () => {
   const { target, size } = injectTriangle()
   const { notify, focus, unnotify } = injectNotification()
 
@@ -69,7 +66,7 @@ const Control = component(() => {
     ArrowRight: "size + 50",
     ArrowLeft: "size - 50",
   }))
-})
+}
 
 render(document.body, () => {
   App()
