@@ -408,6 +408,15 @@ const Notifications = ()=>{
     onDestroy(()=>removeEventListener("error", errorNotify));
     addElement("div", (attr)=>{
         attr.class = "notifications";
+        if (notifications().length > 0) {
+            addElement("div", (attr)=>{
+                attr.class = "notification";
+                disappearOnMouseDown(()=>{
+                    notifications([]);
+                }, 500);
+                addElement("b", ()=>addText("delete all"));
+            });
+        }
         for (const item of [
             ...notifications()
         ].reverse()){
