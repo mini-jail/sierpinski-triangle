@@ -11,28 +11,28 @@ import { injectTriangle, TriangleDemo } from "./src/sierpinski-triangle.ts"
 import { onEvent } from "./src/on-event.ts"
 
 render(document.body, () => {
-  const { target, interval, size, steps } = injectTriangle()
+  const { target, interval, size } = injectTriangle()
   const { notify, focus, unnotify } = injectNotification()
 
   onEvent("keyup", ({ key }) => {
     const controls: Record<string, VoidFunction> = {
       ArrowUp() {
-        size(size() + steps.size)
+        size(size() + 5)
         notify("Settings updated", "Size has been increased")
       },
       ArrowDown() {
-        const next = size() - steps.size
+        const next = size() - 5
         if (next >= 5) {
           size(next)
           notify("Settings updated", "Size has been decreased")
         }
       },
       ArrowLeft() {
-        target(target() - steps.target)
+        target(target() - 50)
         notify("Settings updated", "Target has been decreased")
       },
       ArrowRight() {
-        target(target() + steps.target)
+        target(target() + 50)
         notify("Settings updated", "Target has been increased")
       },
       Delete() {
@@ -44,26 +44,22 @@ render(document.body, () => {
   })
 
   Notifications()
-  FlexBox(Stats, Control)
+  FlexBoxColumn(
+    Stats,
+    Control,
+  )
   TriangleDemo(target(), size(), interval())
 })
 
-const FlexBox = component((...children: (() => void)[]) => {
+const FlexBoxColumn = component((...children: (() => void)[]) => {
   addElement("div", (attr) => {
-    attr.style = {
-      display: "flex",
-      flexDirection: "column",
-      margin: "10px",
-      gap: "10px",
-      width: "max-content",
-    }
+    attr.class = "flex-box-col"
     for (const child of children) child()
   })
 })
 
 const Stats = component(() => {
   const { target, size, interval, dots } = injectTriangle()
-
   addElement("pre", (attr) => {
     attr.class = "window"
     addText("Stats:\n")
@@ -75,14 +71,12 @@ const Stats = component(() => {
 })
 
 const Control = component(() => {
-  const { steps } = injectTriangle()
-
   addElement("pre", (attr) => {
     attr.class = "window"
     addText("Control:\n")
-    addText(`  ArrowUp: size + ${steps.size}\n`)
-    addText(`  ArrowDown: size - ${steps.size}\n`)
-    addText(`  ArrowRight: target + ${steps.target}\n`)
-    addText(`  ArrowLeft: target - ${steps.target}\n`)
+    addText(`  ArrowUp: size + 5\n`)
+    addText(`  ArrowDown: size - 5\n`)
+    addText(`  ArrowRight: target + 50\n`)
+    addText(`  ArrowLeft: target - 50\n`)
   })
 })

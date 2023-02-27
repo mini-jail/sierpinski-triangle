@@ -14,11 +14,6 @@ import {
 const TriangleContext = provider(() => {
   const elapsed = signal(0)
   const count = signal(0)
-
-  const steps = {
-    size: 5,
-    target: 50,
-  }
   return {
     target: signal(1000),
     elapsed,
@@ -26,7 +21,6 @@ const TriangleContext = provider(() => {
     interval: signal(1000),
     size: signal(25),
     dots: signal(0),
-    steps,
     scale: computed(() => {
       const e = (elapsed() / 1000) % 10
       return 1 + (e > 5 ? 10 - e : e) / 10
@@ -59,10 +53,8 @@ export const TriangleDemo = component(
     })
 
     addElement("div", (attr) => {
+      attr.class = "triangle-demo"
       attr.style = () => `
-        position: absolute;
-        left: 50%;
-        top: 50%;
         transform:
           scaleX(${scale() / 2.1}) 
           scaleY(0.7) 
@@ -98,14 +90,11 @@ const Dot = component((x: number, y: number, target: number) => {
   onDestroy(() => dots(dots() - 1))
 
   addElement("div", (attr) => {
+    attr.class = "dot"
     attr.onMouseOver = mouseOver
     attr.onMouseOut = mouseOut
     attr.textContent = text
     attr.style = {
-      position: "absolute",
-      textAlign: "center",
-      cursor: "pointer",
-      userSelect: "none",
       width: target + "px",
       height: target + "px",
       lineHeight: target + "px",

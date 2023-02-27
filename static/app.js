@@ -408,7 +408,7 @@ const Notifications = component(()=>{
             addElement("div", (attr)=>{
                 attr.class = "notification";
                 attr.textContent = `${getTime(item.date)}: ${item.title}`;
-                disappearOnMouseDown(()=>unnotify(item), 2000);
+                disappearOnMouseDown(()=>unnotify(item), 1000);
                 addElement("div", (attr)=>attr.textContent = item.message);
             });
         }
@@ -426,7 +426,7 @@ function disappearOnMouseDown(callback, timeout) {
             callback();
         }, timeout);
     };
-    const onMouseUp = (ev)=>{
+    const onMouseUp = ()=>{
         elt.removeAttribute("disappear");
         clearTimeout(deleteTimeId);
     };
@@ -442,10 +442,6 @@ function disappearOnMouseDown(callback, timeout) {
 const TriangleContext = provider(()=>{
     const elapsed = signal(0);
     const count = signal(0);
-    const steps = {
-        size: 5,
-        target: 50
-    };
     return {
         target: signal(1000),
         elapsed,
@@ -453,7 +449,6 @@ const TriangleContext = provider(()=>{
         interval: signal(1000),
         size: signal(25),
         dots: signal(0),
-        steps,
         scale: computed(()=>{
             const e = elapsed() / 1000 % 10;
             return 1 + (e > 5 ? 10 - e : e) / 10;
@@ -480,10 +475,8 @@ const TriangleDemo = component((target, size, interval)=>{
         clearInterval(id);
     });
     addElement("div", (attr)=>{
+        attr.class = "triangle-demo";
         attr.style = ()=>`
-        position: absolute;
-        left: 50%;
-        top: 50%;
         transform:
           scaleX(${scale() / 2.1}) 
           scaleY(0.7) 
@@ -509,14 +502,11 @@ const Dot = component((x, y, target)=>{
     onMount(()=>dots(dots() + 1));
     onDestroy(()=>dots(dots() - 1));
     addElement("div", (attr)=>{
+        attr.class = "dot";
         attr.onMouseOver = mouseOver;
         attr.onMouseOut = mouseOut;
         attr.textContent = text;
         attr.style = {
-            position: "absolute",
-            textAlign: "center",
-            cursor: "pointer",
-            userSelect: "none",
             width: target + "px",
             height: target + "px",
             lineHeight: target + "px",
@@ -533,27 +523,27 @@ function onEvent(name, callback, options) {
     onDestroy(()=>removeEventListener(name, callback, options));
 }
 render(document.body, ()=>{
-    const { target , interval , size , steps  } = injectTriangle();
+    const { target , interval , size  } = injectTriangle();
     const { notify , focus , unnotify  } = injectNotification();
     onEvent("keyup", ({ key  })=>{
         const controls = {
             ArrowUp () {
-                size(size() + steps.size);
+                size(size() + 5);
                 notify("Settings updated", "Size has been increased");
             },
             ArrowDown () {
-                const next = size() - steps.size;
+                const next = size() - 5;
                 if (next >= 5) {
                     size(next);
                     notify("Settings updated", "Size has been decreased");
                 }
             },
             ArrowLeft () {
-                target(target() - steps.target);
+                target(target() - 50);
                 notify("Settings updated", "Target has been decreased");
             },
             ArrowRight () {
-                target(target() + steps.target);
+                target(target() + 50);
                 notify("Settings updated", "Target has been increased");
             },
             Delete () {
@@ -564,18 +554,12 @@ render(document.body, ()=>{
         controls[key]?.();
     });
     Notifications();
-    FlexBox(Stats, Control);
+    FlexBoxColumn(Stats, Control);
     TriangleDemo(target(), size(), interval());
 });
-const FlexBox = component((...children)=>{
+const FlexBoxColumn = component((...children)=>{
     addElement("div", (attr)=>{
-        attr.style = {
-            display: "flex",
-            flexDirection: "column",
-            margin: "10px",
-            gap: "10px",
-            width: "max-content"
-        };
+        attr.class = "flex-box-col";
         for (const child of children)child();
     });
 });
@@ -591,13 +575,12 @@ const Stats = component(()=>{
     });
 });
 const Control = component(()=>{
-    const { steps  } = injectTriangle();
     addElement("pre", (attr)=>{
         attr.class = "window";
         addText("Control:\n");
-        addText(`  ArrowUp: size + ${steps.size}\n`);
-        addText(`  ArrowDown: size - ${steps.size}\n`);
-        addText(`  ArrowRight: target + ${steps.target}\n`);
-        addText(`  ArrowLeft: target - ${steps.target}\n`);
+        addText(`  ArrowUp: size + 5\n`);
+        addText(`  ArrowDown: size - 5\n`);
+        addText(`  ArrowRight: target + 50\n`);
+        addText(`  ArrowLeft: target - 50\n`);
     });
 });
