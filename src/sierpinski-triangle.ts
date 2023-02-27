@@ -83,8 +83,6 @@ const Dot = component((x: number, y: number, target: number) => {
   const hover = signal(false)
   const mouseOut = () => hover(false)
   const mouseOver = () => hover(true)
-  const text = () => hover() ? "*" + countText() + "*" : countText()
-  const color = () => hover() === true ? "cornflowerblue" : "thistle"
 
   onMount(() => dots(dots() + 1))
   onDestroy(() => dots(dots() - 1))
@@ -93,12 +91,12 @@ const Dot = component((x: number, y: number, target: number) => {
     attr.class = "dot"
     attr.onMouseOver = mouseOver
     attr.onMouseOut = mouseOut
-    attr.textContent = text
+    attr.textContent = () => hover() ? "*" + countText() + "*" : countText()
     attr.style = {
       width: target + "px",
       height: target + "px",
       lineHeight: target + "px",
-      backgroundColor: color,
+      backgroundColor: () => hover() === true ? "cornflowerblue" : "thistle",
       left: x + "px",
       top: y + "px",
       fontSize: (target / 2.5) + "px",

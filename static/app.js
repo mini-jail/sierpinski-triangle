@@ -504,20 +504,18 @@ const Dot = component((x, y, target)=>{
     const hover = signal(false);
     const mouseOut = ()=>hover(false);
     const mouseOver = ()=>hover(true);
-    const text = ()=>hover() ? "*" + countText() + "*" : countText();
-    const color = ()=>hover() === true ? "cornflowerblue" : "thistle";
     onMount(()=>dots(dots() + 1));
     onDestroy(()=>dots(dots() - 1));
     addElement("div", (attr)=>{
         attr.class = "dot";
         attr.onMouseOver = mouseOver;
         attr.onMouseOut = mouseOut;
-        attr.textContent = text;
+        attr.textContent = ()=>hover() ? "*" + countText() + "*" : countText();
         attr.style = {
             width: target + "px",
             height: target + "px",
             lineHeight: target + "px",
-            backgroundColor: color,
+            backgroundColor: ()=>hover() === true ? "cornflowerblue" : "thistle",
             left: x + "px",
             top: y + "px",
             fontSize: target / 2.5 + "px",
@@ -545,7 +543,7 @@ const Info = component((title, data)=>{
         }
     });
 });
-render(document.body, ()=>{
+const App = component(()=>{
     const { target , interval , size  } = injectTriangle();
     Notifications();
     FlexBoxColumn(Stats, Control);
@@ -597,4 +595,7 @@ const Control = component(()=>{
             ArrowRight: "size + 50",
             ArrowLeft: "size - 50"
         }));
+});
+render(document.body, ()=>{
+    App();
 });

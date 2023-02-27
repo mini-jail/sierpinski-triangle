@@ -48,12 +48,15 @@ const NotificationContext = provider(() => {
 
 export const Notifications = component(() => {
   const { notifications, getTime, unnotify, notify } = injectNotification()
+
   const errorNotify = (err: any) => {
     if (typeof err === "object") err = err?.message || JSON.stringify(err)
     notify("Error", String(err))
   }
+
   onMount(() => addEventListener("error", errorNotify))
   onDestroy(() => removeEventListener("error", errorNotify))
+
   addElement("div", (attr) => {
     attr.class = "notifications"
     for (const item of notifications()) {
