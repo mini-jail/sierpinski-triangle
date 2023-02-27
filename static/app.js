@@ -543,12 +543,12 @@ const Info = component((title, data)=>{
         }
     });
 });
-const App = component(()=>{
+const App = ()=>{
     const { target , interval , size  } = injectTriangle();
     Notifications();
     FlexBoxColumn(Stats, Control);
     TriangleDemo(target(), size(), interval());
-});
+};
 const Stats = component(()=>{
     const { target , size , interval , dots  } = injectTriangle();
     Info("Stats", ()=>({

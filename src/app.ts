@@ -8,7 +8,7 @@ import onEvent from "./on-event.ts"
 import FlexBoxColumn from "./flex-box-column.ts"
 import Info from "./info.ts"
 
-const App = component(() => {
+const App = () => {
   const { target, interval, size } = injectTriangle()
 
   Notifications()
@@ -17,7 +17,7 @@ const App = component(() => {
     Control,
   )
   TriangleDemo(target(), size(), interval())
-})
+}
 
 const Stats = component(() => {
   const { target, size, interval, dots } = injectTriangle()
