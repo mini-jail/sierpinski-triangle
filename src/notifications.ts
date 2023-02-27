@@ -58,7 +58,7 @@ export const Notifications = () => {
 
   addElement("div", (attr) => {
     attr.class = "notifications"
-    for (const item of notifications()) {
+    for (const item of [...notifications()].reverse()) {
       addElement("div", (attr) => {
         attr.class = "notification"
         disappearOnMouseDown(() => unnotify(item), 500)
