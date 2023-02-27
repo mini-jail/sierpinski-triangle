@@ -11,3 +11,5 @@ export function onEvent<T extends keyof GlobalEventHandlersEventMap>(
   onMount(() => addEventListener(name, callback, options))
   onDestroy(() => removeEventListener(name, callback, options))
 }
+
+export default onEvent

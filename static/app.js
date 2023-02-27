@@ -396,19 +396,26 @@ const NotificationContext = provider(()=>{
         focus: signal(),
         notifications,
         getTime (date) {
-            return `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+            const pad = (num)=>num.toString().padStart(2, "0");
+            return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
         }
     };
 });
 const Notifications = component(()=>{
-    const { notifications , getTime , unnotify  } = injectNotification();
+    const { notifications , getTime , unnotify , notify  } = injectNotification();
+    const errorNotify = (err)=>{
+        if (typeof err === "object") err = err?.message || JSON.stringify(err);
+        notify("Error", String(err));
+    };
+    onMount(()=>addEventListener("error", errorNotify));
+    onDestroy(()=>removeEventListener("error", errorNotify));
     addElement("div", (attr)=>{
         attr.class = "notifications";
         for (const item of notifications()){
             addElement("div", (attr)=>{
                 attr.class = "notification";
-                attr.textContent = `${getTime(item.date)}: ${item.title}`;
-                disappearOnMouseDown(()=>unnotify(item), 1000);
+                disappearOnMouseDown(()=>unnotify(item), 500);
+                addElement("b", ()=>addText(`${getTime(item.date)}: ${item.title}`));
                 addElement("div", (attr)=>attr.textContent = item.message);
             });
         }
@@ -522,8 +529,39 @@ function onEvent(name, callback, options) {
     onMount(()=>addEventListener(name, callback, options));
     onDestroy(()=>removeEventListener(name, callback, options));
 }
+const FlexBoxColumn = component((...children)=>{
+    addElement("div", (attr)=>{
+        attr.class = "flex-box-col";
+        for (const child of children)child();
+    });
+});
+const Info = component((title, data)=>{
+    addElement("pre", (attr)=>{
+        attr.class = "info";
+        addElement("b", ()=>addText(title + ":\n"));
+        const current = data();
+        for(const field in current){
+            addText(`  ${field}: ${current[field]}\n`);
+        }
+    });
+});
 render(document.body, ()=>{
     const { target , interval , size  } = injectTriangle();
+    Notifications();
+    FlexBoxColumn(Stats, Control);
+    TriangleDemo(target(), size(), interval());
+});
+const Stats = component(()=>{
+    const { target , size , interval , dots  } = injectTriangle();
+    Info("Stats", ()=>({
+            target: target(),
+            size: size(),
+            interval: interval(),
+            dots: dots()
+        }));
+});
+const Control = component(()=>{
+    const { target , size  } = injectTriangle();
     const { notify , focus , unnotify  } = injectNotification();
     onEvent("keyup", ({ key  })=>{
         const controls = {
@@ -553,34 +591,10 @@ render(document.body, ()=>{
         };
         controls[key]?.();
     });
-    Notifications();
-    FlexBoxColumn(Stats, Control);
-    TriangleDemo(target(), size(), interval());
-});
-const FlexBoxColumn = component((...children)=>{
-    addElement("div", (attr)=>{
-        attr.class = "flex-box-col";
-        for (const child of children)child();
-    });
-});
-const Stats = component(()=>{
-    const { target , size , interval , dots  } = injectTriangle();
-    addElement("pre", (attr)=>{
-        attr.class = "window";
-        addText("Stats:\n");
-        addText(`  target: ${target()}\n`);
-        addText(`  size: ${size()}\n`);
-        addText(`  interval: ${interval()}\n`);
-        addText(`  dots: ${dots()}\n`);
-    });
-});
-const Control = component(()=>{
-    addElement("pre", (attr)=>{
-        attr.class = "window";
-        addText("Control:\n");
-        addText(`  ArrowUp: size + 5\n`);
-        addText(`  ArrowDown: size - 5\n`);
-        addText(`  ArrowRight: target + 50\n`);
-        addText(`  ArrowLeft: target - 50\n`);
-    });
+    Info("Control", ()=>({
+            ArrowUp: "size + 5",
+            ArrowDown: "size - 5",
+            ArrowRight: "size + 50",
+            ArrowLeft: "size - 50"
+        }));
 });

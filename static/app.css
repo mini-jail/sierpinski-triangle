@@ -23,11 +23,13 @@ body {
   font-family: monospace;
 }
 
-.window {
+.info {
   padding: 10px;
   background-color: thistle;
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: large;
+  box-shadow: 2px 2px 0px #000;
+  border: 2px solid #000;
 }
 
 .flex-box-col {

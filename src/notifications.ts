@@ -1,5 +1,6 @@
 import {
   addElement,
+  addText,
   component,
   elRef,
 } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
@@ -37,22 +38,29 @@ const NotificationContext = provider(() => {
     focus: signal<Notify>(),
     notifications,
     getTime(date: Date) {
-      return `${date.getHours()}:${
-        date.getMinutes().toString().padStart(2, "0")
-      }:${date.getSeconds().toString().padStart(2, "0")}`
+      const pad = (num: number) => num.toString().padStart(2, "0")
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}:${
+        pad(date.getSeconds())
+      }`
     },
   }
 })
 
 export const Notifications = component(() => {
-  const { notifications, getTime, unnotify } = injectNotification()
+  const { notifications, getTime, unnotify, notify } = injectNotification()
+  const errorNotify = (err: any) => {
+    if (typeof err === "object") err = err?.message || JSON.stringify(err)
+    notify("Error", String(err))
+  }
+  onMount(() => addEventListener("error", errorNotify))
+  onDestroy(() => removeEventListener("error", errorNotify))
   addElement("div", (attr) => {
     attr.class = "notifications"
     for (const item of notifications()) {
       addElement("div", (attr) => {
         attr.class = "notification"
-        attr.textContent = `${getTime(item.date)}: ${item.title}`
-        disappearOnMouseDown(() => unnotify(item), 1000)
+        disappearOnMouseDown(() => unnotify(item), 500)
+        addElement("b", () => addText(`${getTime(item.date)}: ${item.title}`))
         addElement("div", (attr) => attr.textContent = item.message)
       })
     }
