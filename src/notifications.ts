@@ -1,10 +1,14 @@
 import {
   addElement,
   addText,
-  elRef,
+  attributesRef,
+  component,
+  elementRef,
+  view,
 } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 import {
   inject,
+  injection,
   onDestroy,
   onMount,
   provider,
@@ -17,11 +21,12 @@ export type Notify = {
   message: string
 }
 
-export const injectNotification = () => inject(NotificationContext)
+export const injectNotification = () => inject(NotificationInjection)
 
-const NotificationContext = provider(() => {
+const NotificationInjection = injection((() => {
   const notifications = signal<Notify[]>([])
   return {
+    notifications,
     notify(title: string, message: string) {
       notifications(
         notifications().concat({
@@ -35,18 +40,11 @@ const NotificationContext = provider(() => {
       notifications(notifications().filter(($) => $ !== item))
     },
     focus: signal<Notify>(),
-    notifications,
-    getTime(date: Date) {
-      const pad = (num: number) => num.toString().padStart(2, "0")
-      return `${pad(date.getHours())}:${pad(date.getMinutes())}:${
-        pad(date.getSeconds())
-      }`
-    },
   }
-})
+})())
 
-export const Notifications = () => {
-  const { notifications, getTime, unnotify, notify } = injectNotification()
+export const Notifications = component(() => {
+  const { notifications, unnotify, notify } = injectNotification()
 
   const errorNotify = (err: any) => {
     if (typeof err === "object") err = err?.message || JSON.stringify(err)
@@ -59,49 +57,40 @@ export const Notifications = () => {
   addElement("div", (attr) => {
     attr.class = "notifications"
 
-    if (notifications().length > 0) {
-      addElement("div", (attr) => {
-        attr.class = "notification"
-        disappearOnMouseDown(() => {
-          notifications([])
-        }, 500)
-        addElement("b", () => addText("delete all"))
-      })
-    }
+    view(() => {
+      if (notifications().length > 0) {
+        addElement("div", (attr) => {
+          attr.class = "notification"
+          disappearOnMouseDown(() => notifications([]), 500)
+          addElement("b", () => addText("delete all"))
+        })
+      }
+    })
 
-    for (const item of [...notifications()].reverse()) {
-      addElement("div", (attr) => {
-        attr.class = "notification"
-        disappearOnMouseDown(() => unnotify(item), 500)
-        addElement("b", () => addText(`${getTime(item.date)}: ${item.title}`))
-        addElement("div", (attr) => attr.textContent = item.message)
-      })
-    }
+    view(() => {
+      for (const item of [...notifications()].reverse()) {
+        addElement("div", (attr) => {
+          attr.class = "notification"
+          disappearOnMouseDown(() => unnotify(item), 500)
+          addElement("b", () => addText(item.title))
+          addElement("div", () => addText(item.message))
+        })
+      }
+    })
   })
-}
+})
 
 function disappearOnMouseDown(callback: () => void, timeout: number) {
-  const elt = elRef()
-  if (elt === undefined) return
+  const atrs = attributesRef()!
   let deleteTimeId: number
-  const onMouseDown = (ev: MouseEvent) => {
-    if (ev.button !== 0) return
-    elt.setAttribute("disappear", "")
-    elt.style.setProperty("--timeout", timeout + "ms")
-    deleteTimeId = setTimeout(() => {
-      callback()
-    }, timeout)
-  }
-  const onMouseUp = () => {
-    elt.removeAttribute("disappear")
+  atrs.onMouseUp = (ev) => {
+    ev.currentTarget.removeAttribute("disappear")
     clearTimeout(deleteTimeId)
   }
-  onMount(() => {
-    elt.addEventListener("mousedown", onMouseDown)
-    elt.addEventListener("mouseup", onMouseUp)
-  })
-  onDestroy(() => {
-    elt.removeEventListener("mousedown", onMouseDown)
-    elt.removeEventListener("mouseup", onMouseUp)
-  })
+  atrs.onMouseDown = (ev) => {
+    if (ev.button !== 0) return
+    ev.currentTarget.setAttribute("disappear", "")
+    ev.currentTarget.style.setProperty("--timeout", timeout + "ms")
+    deleteTimeId = setTimeout(callback, timeout)
+  }
 }

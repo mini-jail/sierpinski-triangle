@@ -1,22 +1,28 @@
-import { render } from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
+import {
+  component,
+  render,
+  view,
+} from "https://raw.githubusercontent.com/mini-jail/dom/main/mod.ts"
 import { injectNotification, Notifications } from "./notifications.ts"
 import { injectTriangle, TriangleDemo } from "./sierpinski-triangle.ts"
 import onEvent from "./on-event.ts"
 import FlexBoxColumn from "./flex-box-column.ts"
 import Info from "./info.ts"
 
-const App = () => {
+const App = component(() => {
   const { target, interval, size } = injectTriangle()
 
-  Notifications()
-  FlexBoxColumn(
-    Stats,
-    Control,
-  )
-  TriangleDemo(target(), size(), interval())
-}
+  view(() => {
+    Notifications()
+    FlexBoxColumn(
+      Stats,
+      Control,
+    )
+    TriangleDemo(target(), size(), interval())
+  })
+})
 
-const Stats = () => {
+const Stats = component(() => {
   const { target, size, interval, dots } = injectTriangle()
 
   Info("Stats", () => ({
@@ -25,9 +31,9 @@ const Stats = () => {
     interval: interval(),
     dots: dots(),
   }))
-}
+})
 
-const Control = () => {
+const Control = component(() => {
   const { target, size } = injectTriangle()
   const { notify, focus, unnotify } = injectNotification()
 
@@ -66,7 +72,7 @@ const Control = () => {
     ArrowRight: "size + 50",
     ArrowLeft: "size - 50",
   }))
-}
+})
 
 render(document.body, () => {
   App()

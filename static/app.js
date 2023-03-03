@@ -2,33 +2,33 @@
 // deno-lint-ignore-file
 // This code was bundled using `deno bundle` and it's not recommended to edit it manually
 
-const Error = Symbol("Error");
+const Error = Symbol();
 const Queue = new Set();
 let nodeQueue;
 let parentNode;
 function scoped(callback) {
-    const _node = node();
-    parentNode = _node;
+    const node = createNode();
+    parentNode = node;
     try {
         return batch(()=>{
             let _cleanup = undefined;
             if (callback.length) {
-                _cleanup = cleanNode.bind(undefined, _node, true);
+                _cleanup = cleanNode.bind(undefined, node, true);
             }
             return callback(_cleanup);
         });
     } catch (error) {
         handleError(error);
     } finally{
-        parentNode = _node.parentNode;
+        parentNode = node.parentNode;
     }
 }
-function node(initialValue, callback) {
+function createNode(initialValue, callback) {
     const _node = {
         value: initialValue,
         parentNode,
         children: undefined,
-        context: undefined,
+        injections: undefined,
         cleanups: undefined,
         callback,
         sources: undefined,
@@ -53,29 +53,24 @@ function onDestroy(callback) {
 }
 function effect(callback, initialValue) {
     if (parentNode) {
-        const _node = node(initialValue, callback);
-        if (nodeQueue) nodeQueue.add(_node);
-        else queueMicrotask(()=>updateNode(_node, false));
+        const node = createNode(initialValue, callback);
+        if (nodeQueue) nodeQueue.add(node);
+        else queueMicrotask(()=>updateNode(node, false));
     } else {
         queueMicrotask(()=>callback(initialValue));
     }
 }
-function computed(callback, initialValue) {
-    const _source = source(initialValue);
-    effect(()=>set(_source, callback(_source.value)));
-    return get.bind(undefined, _source);
-}
 function lookup(node, id) {
-    return node ? node.context && id in node.context ? node.context[id] : lookup(node.parentNode, id) : undefined;
+    return node ? node.injections && id in node.injections ? node.injections[id] : lookup(node.parentNode, id) : undefined;
 }
-function source(initialValue) {
+function createSource(initialValue) {
     return {
         value: initialValue,
         nodes: undefined,
         nodeSlots: undefined
     };
 }
-function get(source) {
+function getSourceValue(source) {
     if (parentNode && parentNode.callback) {
         const sourceSlot = source.nodes?.length || 0, nodeSlot = parentNode.sources?.length || 0;
         if (parentNode.sources === undefined) {
@@ -103,7 +98,7 @@ function get(source) {
     }
     return source.value;
 }
-function set(source, value) {
+function setSourceValue(source, value) {
     if (typeof value === "function") value = value(source.value);
     source.value = value;
     if (source.nodes?.length) {
@@ -114,12 +109,12 @@ function set(source, value) {
         });
     }
 }
-function getSet(source, value) {
-    return arguments.length === 1 ? get(source) : set(source, value);
+function sourceValue(source, value) {
+    return arguments.length === 1 ? getSourceValue(source) : setSourceValue(source, value);
 }
 function signal(initialValue) {
-    const _source = source(initialValue);
-    return getSet.bind(undefined, _source);
+    const source = createSource(initialValue);
+    return sourceValue.bind(undefined, source);
 }
 function handleError(error) {
     const errorCallbacks = lookup(parentNode, Error);
@@ -198,7 +193,7 @@ function cleanNode(node, complete) {
     if (node.sources?.length) cleanNodeSources(node);
     if (node.children?.length) cleanChildNodes(node, complete);
     if (node.cleanups?.length) cleanup(node);
-    node.context = undefined;
+    node.injections = undefined;
     if (complete) disposeNode(node);
 }
 function cleanup(node) {
@@ -215,68 +210,80 @@ function disposeNode(node) {
     node.sources = undefined;
     node.sourceSlots = undefined;
 }
-function context(defaultValue) {
+function injection(defaultValue) {
     return {
         id: Symbol(),
-        defaultValue,
-        provide (value, callback) {
-            return scoped(()=>{
-                parentNode.context = {
-                    [this.id]: value
-                };
-                return callback();
-            });
-        }
+        defaultValue
     };
 }
-function provider(callback) {
-    return scoped(()=>context(callback()));
+function inject(injection) {
+    return lookup(parentNode, injection.id) || injection.defaultValue;
 }
-function inject(context) {
-    return lookup(parentNode, context.id) || context.defaultValue;
-}
+let parentAtrs;
 let parentFgt;
 let parentElt;
-function elRef() {
-    return parentElt;
+function attributesRef() {
+    if (parentElt === undefined) return undefined;
+    if (parentAtrs === undefined) parentAtrs = {};
+    return parentAtrs;
 }
 function addElement(tagName, callback) {
-    if (parentElt || parentFgt) {
-        const elt = document.createElement(tagName);
-        if (callback) modify(elt, callback);
-        insert(elt);
-    }
+    const elt = document.createElement(tagName);
+    if (callback) modify(elt, callback);
+    insert(elt);
 }
 function addText(value) {
-    if (parentElt || parentFgt) insert(new Text(String(value)));
+    insert(new Text(String(value)));
 }
 function render(rootElt, callback) {
     return scoped((cleanup)=>{
-        modify(rootElt, callback);
+        const previousElt = parentElt;
+        parentElt = rootElt;
+        callback();
+        parentElt = previousElt;
         return cleanup;
     });
 }
-function union(elt, curr, next) {
-    const currentLength = curr.length;
+function view(callback) {
+    if (parentElt === undefined) return callback();
+    const anchor = parentElt.appendChild(new Text());
+    effect((current)=>{
+        parentFgt = [];
+        callback();
+        union(anchor.parentNode, anchor, current, parentFgt);
+        return parentFgt.length > 0 ? parentFgt : undefined;
+    });
+}
+function component(callback) {
+    return (...args)=>scoped(()=>callback(...args));
+}
+function insertBefore(elt, child, anchor) {
+    elt.insertBefore(child, anchor);
+}
+function union(elt, anchor, current, next) {
+    if (current === undefined) {
+        return next.forEach((node)=>insertBefore(elt, node, anchor));
+    }
+    const currentLength = current.length;
     const nextLength = next.length;
     let currentNode, i, j;
     outerLoop: for(i = 0; i < nextLength; i++){
-        currentNode = curr[i];
+        currentNode = current[i];
         for(j = 0; j < currentLength; j++){
-            if (curr[j] === undefined) continue;
-            else if (curr[j].nodeType === 3 && next[i].nodeType === 3) {
-                if (curr[j].data !== next[i].data) curr[j].data = next[i].data;
-                next[i] = curr[j];
-            } else if (curr[j].isEqualNode(next[i])) next[i] = curr[j];
-            if (next[i] === curr[j]) {
-                curr[j] = undefined;
+            if (current[j] === undefined) continue;
+            else if (current[j].nodeType === 3 && next[i].nodeType === 3) {
+                if (current[j].data !== next[i].data) current[j].data = next[i].data;
+                next[i] = current[j];
+            } else if (current[j].isEqualNode(next[i])) next[i] = current[j];
+            if (next[i] === current[j]) {
+                current[j] = undefined;
                 if (i === j) continue outerLoop;
                 break;
             }
         }
-        elt.insertBefore(next[i], currentNode?.nextSibling || null);
+        insertBefore(elt, next[i], currentNode?.nextSibling || anchor);
     }
-    while(curr.length)curr.pop()?.remove();
+    while(current.length)current.pop()?.remove();
 }
 function qualifiedName(name) {
     return name.replace(/([A-Z])/g, (match)=>"-" + match[0]).toLowerCase();
@@ -284,102 +291,69 @@ function qualifiedName(name) {
 function eventName(name) {
     return name.startsWith("on:") ? name.slice(3) : name.slice(2).toLowerCase();
 }
-function objectAttribute(elt, field, curr, next) {
-    const fields = fieldsFrom(curr, next);
-    if (fields.length === 0) return;
-    for (const subField of fields){
-        if (next && typeof next[subField] === "function") {
+function objectAttribute(elt, field, object) {
+    for(const subField in object){
+        const value = object[subField];
+        if (typeof value === "function") {
             effect((subCurr)=>{
-                const subNext = next[subField]();
-                if (subNext !== subCurr) elt[field][subField] = subNext;
+                const subNext = value();
+                if (subNext !== subCurr) elt[field][subField] = subNext || null;
                 return subNext;
             });
-        } else if (curr && curr[subField] && next[subField] === undefined) {
-            elt[field][subField] = null;
-        } else if ((curr && curr[subField]) !== next[subField]) {
-            elt[field][subField] = next[subField] || null;
+        } else {
+            elt[field][subField] = value || null;
         }
     }
 }
-function dynamicAttribute(elt, field, accessor) {
-    effect((curr)=>{
-        const next = accessor();
-        if (next !== curr) attribute(elt, field, curr, next);
+function dynamicAttribute(elt, field, value) {
+    effect((current)=>{
+        const next = value();
+        if (next !== current) attribute(elt, field, next);
         return next;
     });
 }
-function attribute(elt, field, curr, next) {
-    if (typeof next === "function" && !field.startsWith("on")) {
-        dynamicAttribute(elt, field, next);
-    } else if (typeof next === "object") {
-        objectAttribute(elt, field, curr, next);
+function attribute(elt, field, value) {
+    if (typeof value === "function" && !field.startsWith("on")) {
+        dynamicAttribute(elt, field, value);
+    } else if (typeof value === "object") {
+        objectAttribute(elt, field, value);
     } else if (field === "textContent") {
-        if (elt.firstChild?.nodeType === 3) elt.firstChild.data = next;
-        else elt.prepend(String(next));
+        if (elt.firstChild?.nodeType === 3) elt.firstChild.data = String(value);
+        else elt.prepend(String(value));
     } else if (field in elt) {
-        if (curr && next === undefined) elt[field] = null;
-        else elt[field] = next;
+        elt[field] = value;
     } else if (field.startsWith("on")) {
-        curr && elt.removeEventListener(eventName(field), curr);
-        next && elt.addEventListener(eventName(field), next);
-    } else if (next !== undefined) {
-        elt.setAttributeNS(null, qualifiedName(field), String(next));
+        elt.addEventListener(eventName(field), value);
+    } else if (value != null) {
+        elt.setAttributeNS(null, qualifiedName(field), String(value));
     } else {
         elt.removeAttributeNS(null, qualifiedName(field));
     }
 }
 function insert(node) {
-    if (parentFgt) parentFgt.push(node);
+    if (parentElt === undefined) parentFgt?.push(node);
     else parentElt?.appendChild(node);
 }
-function fieldsFrom(...objects) {
-    const fields = [];
-    for (const object of objects){
-        if (object == null) continue;
-        for(const field in object){
-            if (fields.includes(field) === false) {
-                fields.push(field);
-            }
-        }
-    }
-    return fields;
-}
-function attributes(elt, curr, next) {
-    const fields = fieldsFrom(curr, next);
-    if (fields.length === 0) return;
-    for (const field of fields){
-        const cValue = curr ? curr[field] : undefined;
-        const nValue = next ? next[field] : undefined;
-        if (cValue !== nValue) attribute(elt, field, cValue, nValue);
-    }
-}
-function children(elt, curr, next) {
-    if (curr?.length) union(elt, curr, next);
-    else if (next.length) elt.append(...next);
-}
 function modify(elt, callback) {
-    effect((curr)=>{
-        const next = [
-            callback.length ? {} : undefined,
-            []
-        ];
-        parentElt = elt;
-        parentFgt = next[1];
-        callback(next[0]);
-        if (curr || next[0]) attributes(elt, curr ? curr[0] : undefined, next[0]);
-        if (curr || next[1].length) {
-            children(elt, curr ? curr[1] : undefined, next[1]);
+    const previousElt = parentElt;
+    const previousAtrs = parentAtrs;
+    parentElt = elt;
+    parentAtrs = undefined;
+    if (callback.length) parentAtrs = {};
+    callback(parentAtrs);
+    if (parentAtrs && parentAtrs !== previousAtrs) {
+        for(const field in parentAtrs){
+            attribute(elt, field, parentAtrs[field]);
         }
-        if (next[1].length === 0) next[1] = undefined;
-        parentElt = undefined;
-        parentFgt = undefined;
-        return next;
-    });
+    }
+    parentElt = previousElt;
+    parentAtrs = previousAtrs;
 }
-const injectNotification = ()=>inject(NotificationContext);
-const NotificationContext = provider(()=>{
+const injectNotification = ()=>inject(NotificationInjection);
+const NotificationInjection = injection((()=>{
     const notifications = signal([]);
     return {
+        notifications,
         notify (title, message) {
             notifications(notifications().concat({
                 date: new Date(),
@@ -390,16 +364,11 @@ const NotificationContext = provider(()=>{
         unnotify (item) {
             notifications(notifications().filter(($)=>$ !== item));
         },
-        focus: signal(),
-        notifications,
-        getTime (date) {
-            const pad = (num)=>num.toString().padStart(2, "0");
-            return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-        }
+        focus: signal()
     };
-});
-const Notifications = ()=>{
-    const { notifications , getTime , unnotify , notify  } = injectNotification();
+})());
+const Notifications = component(()=>{
+    const { notifications , unnotify , notify  } = injectNotification();
     const errorNotify = (err)=>{
         if (typeof err === "object") err = err?.message || JSON.stringify(err);
         notify("Error", String(err));
@@ -408,75 +377,68 @@ const Notifications = ()=>{
     onDestroy(()=>removeEventListener("error", errorNotify));
     addElement("div", (attr)=>{
         attr.class = "notifications";
-        if (notifications().length > 0) {
-            addElement("div", (attr)=>{
-                attr.class = "notification";
-                disappearOnMouseDown(()=>{
-                    notifications([]);
-                }, 500);
-                addElement("b", ()=>addText("delete all"));
-            });
-        }
-        for (const item of [
-            ...notifications()
-        ].reverse()){
-            addElement("div", (attr)=>{
-                attr.class = "notification";
-                disappearOnMouseDown(()=>unnotify(item), 500);
-                addElement("b", ()=>addText(`${getTime(item.date)}: ${item.title}`));
-                addElement("div", (attr)=>attr.textContent = item.message);
-            });
-        }
+        view(()=>{
+            if (notifications().length > 0) {
+                addElement("div", (attr)=>{
+                    attr.class = "notification";
+                    disappearOnMouseDown(()=>notifications([]), 500);
+                    addElement("b", ()=>addText("delete all"));
+                });
+            }
+        });
+        view(()=>{
+            for (const item of [
+                ...notifications()
+            ].reverse()){
+                addElement("div", (attr)=>{
+                    attr.class = "notification";
+                    disappearOnMouseDown(()=>unnotify(item), 500);
+                    addElement("b", ()=>addText(item.title));
+                    addElement("div", ()=>addText(item.message));
+                });
+            }
+        });
     });
-};
+});
 function disappearOnMouseDown(callback, timeout) {
-    const elt = elRef();
-    if (elt === undefined) return;
+    const atrs = attributesRef();
     let deleteTimeId;
-    const onMouseDown = (ev)=>{
-        if (ev.button !== 0) return;
-        elt.setAttribute("disappear", "");
-        elt.style.setProperty("--timeout", timeout + "ms");
-        deleteTimeId = setTimeout(()=>{
-            callback();
-        }, timeout);
-    };
-    const onMouseUp = ()=>{
-        elt.removeAttribute("disappear");
+    atrs.onMouseUp = (ev)=>{
+        ev.currentTarget.removeAttribute("disappear");
         clearTimeout(deleteTimeId);
     };
-    onMount(()=>{
-        elt.addEventListener("mousedown", onMouseDown);
-        elt.addEventListener("mouseup", onMouseUp);
-    });
-    onDestroy(()=>{
-        elt.removeEventListener("mousedown", onMouseDown);
-        elt.removeEventListener("mouseup", onMouseUp);
-    });
+    atrs.onMouseDown = (ev)=>{
+        if (ev.button !== 0) return;
+        ev.currentTarget.setAttribute("disappear", "");
+        ev.currentTarget.style.setProperty("--timeout", timeout + "ms");
+        deleteTimeId = setTimeout(callback, timeout);
+    };
 }
-const TriangleContext = provider(()=>{
+const TriangleInjection = injection((()=>{
     const elapsed = signal(0);
     const count = signal(0);
     return {
-        target: signal(1000),
         elapsed,
         count,
+        dots: signal(0),
+        target: signal(1000),
         interval: signal(1000),
         size: signal(25),
-        dots: signal(0),
-        scale: computed(()=>{
+        scale () {
             const e = elapsed() / 1000 % 10;
             return 1 + (e > 5 ? 10 - e : e) / 10;
-        }),
-        countText: computed(()=>count().toString())
+        },
+        countText () {
+            return count().toString();
+        }
     };
-});
-const injectTriangle = ()=>inject(TriangleContext);
-const TriangleDemo = (target, size, interval)=>{
-    const { elapsed , count , scale  } = injectTriangle();
+})());
+const injectTriangle = ()=>inject(TriangleInjection);
+const TriangleDemo = component((target, size, interval)=>{
+    const { elapsed , count , scale , dots  } = injectTriangle();
     let id;
     onMount(()=>{
-        console.log("mount");
+        console.log("mount: TriangleDemo");
         id = setInterval(()=>count(count() % 10 + 1), interval);
         const start = Date.now();
         const frame = ()=>{
@@ -486,7 +448,7 @@ const TriangleDemo = (target, size, interval)=>{
         requestAnimationFrame(frame);
     });
     onDestroy(()=>{
-        console.log("destroy");
+        console.log("destroy:TriangleDemo");
         clearInterval(id);
     });
     addElement("div", (attr)=>{
@@ -499,21 +461,25 @@ const TriangleDemo = (target, size, interval)=>{
       `;
         Triangle(0, 0, target, size);
     });
-};
-const Triangle = (x, y, target, size)=>{
+});
+const Triangle = component((x, y, target, size)=>{
     if (target <= size) return Dot(x, y, target);
     target = target / 2;
     Triangle(x, y - target / 2, target, size);
     Triangle(x - target, y + target / 2, target, size);
     Triangle(x + target, y + target / 2, target, size);
-};
-const Dot = (x, y, target)=>{
-    const { countText , dots  } = inject(TriangleContext);
+});
+const Dot = component((x, y, target)=>{
+    const { countText , dots  } = injectTriangle();
     const hover = signal(false);
     const mouseOut = ()=>hover(false);
     const mouseOver = ()=>hover(true);
-    onMount(()=>dots(dots() + 1));
-    onDestroy(()=>dots(dots() - 1));
+    onMount(()=>{
+        dots(dots() + 1);
+    });
+    onDestroy(()=>{
+        dots(dots() - 1);
+    });
     addElement("div", (attr)=>{
         attr.class = "dot";
         attr.onMouseOver = mouseOver;
@@ -530,34 +496,40 @@ const Dot = (x, y, target)=>{
             borderRadius: target + "px"
         };
     });
-};
+});
 function onEvent(name, callback, options) {
     onMount(()=>addEventListener(name, callback, options));
     onDestroy(()=>removeEventListener(name, callback, options));
 }
-const FlexBoxColumn = (...children)=>{
+const FlexBoxColumn = component((...children)=>{
     addElement("div", (attr)=>{
         attr.class = "flex-box-col";
-        for (const child of children)child();
+        view(()=>{
+            for (const child of children)child();
+        });
     });
-};
-const Info = (title, data)=>{
+});
+const Info = component((title, data)=>{
     addElement("pre", (attr)=>{
         attr.class = "info";
         addElement("b", ()=>addText(title + ":\n"));
-        const current = data();
-        for(const field in current){
-            addText(`  ${field}: ${current[field]}\n`);
-        }
+        view(()=>{
+            const current = data();
+            for(const field in current){
+                addText(`  ${field}: ${current[field]}\n`);
+            }
+        });
     });
-};
-const App = ()=>{
+});
+const App = component(()=>{
     const { target , interval , size  } = injectTriangle();
-    Notifications();
-    FlexBoxColumn(Stats, Control);
-    TriangleDemo(target(), size(), interval());
-};
-const Stats = ()=>{
+    view(()=>{
+        Notifications();
+        FlexBoxColumn(Stats, Control);
+        TriangleDemo(target(), size(), interval());
+    });
+});
+const Stats = component(()=>{
     const { target , size , interval , dots  } = injectTriangle();
     Info("Stats", ()=>({
             target: target(),
@@ -565,8 +537,8 @@ const Stats = ()=>{
             interval: interval(),
             dots: dots()
         }));
-};
-const Control = ()=>{
+});
+const Control = component(()=>{
     const { target , size  } = injectTriangle();
     const { notify , focus , unnotify  } = injectNotification();
     onEvent("keyup", ({ key  })=>{
@@ -603,7 +575,7 @@ const Control = ()=>{
             ArrowRight: "size + 50",
             ArrowLeft: "size - 50"
         }));
-};
+});
 render(document.body, ()=>{
     App();
 });
