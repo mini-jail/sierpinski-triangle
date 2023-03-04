@@ -219,13 +219,13 @@ function injection(defaultValue) {
 function inject(injection) {
     return lookup(parentNode, injection.id) || injection.defaultValue;
 }
-let parentAtrs;
+let parentAttrs;
 let parentFgt;
 let parentElt;
 function attributesRef() {
     if (parentElt === undefined) return undefined;
-    if (parentAtrs === undefined) parentAtrs = {};
-    return parentAtrs;
+    if (parentAttrs === undefined) parentAttrs = {};
+    return parentAttrs;
 }
 function addElement(tagName, callback) {
     const elt = document.createElement(tagName);
@@ -233,7 +233,7 @@ function addElement(tagName, callback) {
     insert(elt);
 }
 function addText(value) {
-    insert(new Text(String(value)));
+    insert(document.createTextNode(String(value)));
 }
 function render(rootElt, callback) {
     return scoped((cleanup)=>{
@@ -250,7 +250,7 @@ function view(callback) {
     effect((current)=>{
         parentFgt = [];
         callback();
-        union(anchor.parentNode, anchor, current, parentFgt);
+        union(anchor, current, parentFgt);
         return parentFgt.length > 0 ? parentFgt : undefined;
     });
 }
@@ -260,7 +260,8 @@ function component(callback) {
 function insertBefore(elt, child, anchor) {
     elt.insertBefore(child, anchor);
 }
-function union(elt, anchor, current, next) {
+function union(anchor, current, next) {
+    const elt = anchor.parentNode;
     if (current === undefined) {
         return next.forEach((node)=>insertBefore(elt, node, anchor));
     }
@@ -336,18 +337,17 @@ function insert(node) {
 }
 function modify(elt, callback) {
     const previousElt = parentElt;
-    const previousAtrs = parentAtrs;
+    const previousAttrs = parentAttrs;
     parentElt = elt;
-    parentAtrs = undefined;
-    if (callback.length) parentAtrs = {};
-    callback(parentAtrs);
-    if (parentAtrs && parentAtrs !== previousAtrs) {
-        for(const field in parentAtrs){
-            attribute(elt, field, parentAtrs[field]);
+    parentAttrs = callback.length ? {} : undefined;
+    callback(parentAttrs);
+    if (parentAttrs) {
+        for(const field in parentAttrs){
+            attribute(elt, field, parentAttrs[field]);
         }
     }
     parentElt = previousElt;
-    parentAtrs = previousAtrs;
+    parentAttrs = previousAttrs;
 }
 const injectNotification = ()=>inject(NotificationInjection);
 const NotificationInjection = injection((()=>{
